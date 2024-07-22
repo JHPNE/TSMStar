@@ -59,7 +59,6 @@ void SDLWindow::start() {
         SDL_Delay(100);
     }
 }
-
 void SDLWindow::printPoints() {
     if (cities.empty()) {
         std::cerr << "No cities to draw." << std::endl;
@@ -83,24 +82,73 @@ void SDLWindow::printPoints() {
         SDL_RenderFillRect(renderer, &rect);
     }
 
-    // Draw lines from cities to the closest net points
-    SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // Red for city to net lines
+    // Create a vector to store the angle and radius for sorting
+    struct PolarPoint {
+        Vector<2> vector;
+        float angle;
+        float radius;
+    };
+    std::vector<PolarPoint> polarPoints;
+
+    // Calculate the center point
+    Vector<2> center = calculateCenter();
+
+    // Calculate angle and radius for each point and store in the vector
     for (const auto& [cityPos, _] : cities) {
         Vector<2> closestNetPoint = findClosestPoint(cityPos, net);
-        drawLine(cityPos, closestNetPoint);
+        float dx = closestNetPoint[0] - center[0];
+        float dy = closestNetPoint[1] - center[1];
+        float angle = std::atan2(dy, dx);
+        float radius = std::sqrt(dx * dx + dy * dy);
+        polarPoints.push_back({cityPos, angle, radius});
     }
 
-    /*
-    // Draw lines between closest net points
-    SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255); // Blue for net to net lines
-    for (const auto& [netPos, _] : net) {
-        Vector<2> closestNetPoint = findClosestNetPoint(netPos);
-        if (!(netPos == closestNetPoint)) {
-            drawLine(netPos, closestNetPoint);
+    // Sort the points by angle and then by radius
+    std::sort(polarPoints.begin(), polarPoints.end(), [](const PolarPoint& a, const PolarPoint& b) {
+        if (std::fabs(a.angle - b.angle) < 0.001) { // If angles are very close, sort by radius
+            return a.radius < b.radius;
         }
+        return a.angle < b.angle;
+    });
+
+    // Draw lines between sorted points and connect the last point to the first
+    Vector<2> previousVector;
+    bool isPreviousVectorSet = false;
+    Vector<2> firstVector;
+
+    for (const auto& polarPoint : polarPoints) {
+        if (isPreviousVectorSet) {
+            drawLine(previousVector, polarPoint.vector);
+        } else {
+            firstVector = polarPoint.vector;
+        }
+
+        previousVector = polarPoint.vector;
+        isPreviousVectorSet = true;
     }
-    */
+
+    // Connect the last vector with the first vector
+    if (isPreviousVectorSet) {
+        drawLine(previousVector, firstVector);
+    }
 }
+
+Vector<2> SDLWindow::calculateCenter() {
+    float middlePointX = 0.0f;
+    float middlePointY = 0.0f;
+
+    for (const auto& entry : cities) {
+        middlePointX += entry.first[0];
+        middlePointY += entry.first[1];
+    }
+
+    middlePointX /= static_cast<float>(cities.size());
+    middlePointY /= static_cast<float>(cities.size());
+
+    return Vector<2>{middlePointX, middlePointY};
+}
+
+
 
 Vector<2> SDLWindow::findClosestPoint(const Vector<2>& source, const std::unordered_map<Vector<2>, SDL_Rect>& targets) {
     Vector<2> closestPoint;
@@ -165,6 +213,7 @@ void SDLWindow::createNetPoints(Vector<2> vec) {
     net[vec] = pointRect;
 
     float radius = 0;
+    int k = 0;
     for (int j = 0; j < radiusIncrement; ++j) {
         radius += 50;
         for (int i = 0; i < numPoints; ++i) {
@@ -177,6 +226,8 @@ void SDLWindow::createNetPoints(Vector<2> vec) {
                                    pointSize };
             Vector<2> newPoint = Vector<2>{x, y};
             net[newPoint] = pointRect;
+            distanceMap[newPoint] = k + radius;
+            ++k;
         }
     }
 }
@@ -192,7 +243,7 @@ void SDLWindow::createPoints() {
     SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF); // Set draw color to white
 
     const int numberOfPoints = 15;
-    const int pointSize = 10;
+    const int pointSize = 8;
 
     for (int i = 0; i < numberOfPoints; ++i) {
         double randomX = (rand() / (double)RAND_MAX) * upperBoundWidth;

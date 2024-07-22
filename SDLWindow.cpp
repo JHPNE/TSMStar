@@ -201,8 +201,8 @@ float SDLWindow::calculateDistance(const Vector<2>& point1, const Vector<2>& poi
 
 void SDLWindow::createNetPoints(Vector<2> vec) {
     const int pointSize = 5;
-    const int numPoints = 30;
-    const int radiusIncrement = 10;
+    const int numPoints = numberOfPoints * 2;
+    const int radiusIncrement = numberOfPoints;
 
     float angleIncrement = 2 * M_PI / numPoints;
 
@@ -242,7 +242,6 @@ void SDLWindow::createPoints() {
 
     SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF); // Set draw color to white
 
-    const int numberOfPoints = 15;
     const int pointSize = 8;
 
     for (int i = 0; i < numberOfPoints; ++i) {

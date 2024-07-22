@@ -21,12 +21,13 @@ private:
     void createNetPoints(Vector<2>);
     float calculateDistance(const Vector<2>& point1, const Vector<2>& point2);
     Vector<2> findClosestPoint(const Vector<2>& source, const std::unordered_map<Vector<2>, SDL_Rect>& targets);
-    Vector<2> findClosestNetPoint(const Vector<2>& source);
     Vector<2> calculateCenter();
 
 
     SDL_Window* window;
     SDL_Renderer* renderer;
+    // Change value to play around
+    int numberOfPoints = 30;
     bool quit;
     double SCREEN_WIDTH;
     double SCREEN_HEIGHT;

@@ -1,11 +1,9 @@
-// SDLWindow.cpp
 #include "SDLWindow.h"
 #include <iostream>
 #include <cstdlib>
 #include <ctime>
 #include <algorithm>
-
-#include "MapManager.h"
+#include <cmath>
 
 SDLWindow::SDLWindow(const char* title, double width, double height)
     : window(nullptr), quit(false), renderer(nullptr), SCREEN_WIDTH(width), SCREEN_HEIGHT(height) {
@@ -30,12 +28,6 @@ SDLWindow::SDLWindow(const char* title, double width, double height)
 
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
 
-    // add directions
-    vectorList.emplace_back(1, 0);
-    vectorList.emplace_back(0, 1);
-    vectorList.emplace_back(-1, 0);
-    vectorList.emplace_back(0, -1);
-
     if (!renderer) {
         std::cerr << "Failed to create renderer: " << SDL_GetError() << std::endl;
         SDL_DestroyWindow(window);
@@ -57,21 +49,19 @@ void SDLWindow::start() {
     createNet();
     while (!quit) {
         handleEvents();
-        // Clear the renderer
         SDL_SetRenderDrawColor(renderer, 0x00, 0x00, 0x00, 0xFF); // Set draw color to black
         SDL_RenderClear(renderer);
 
-        // Draw points and line
         printPoints();
 
-        // Update the screen
         SDL_RenderPresent(renderer);
 
         SDL_Delay(100);
     }
 }
+
 void SDLWindow::printPoints() {
-    if (cities.size() < 1) {
+    if (cities.empty()) {
         std::cerr << "No cities to draw." << std::endl;
         return;
     }
@@ -93,8 +83,40 @@ void SDLWindow::printPoints() {
         SDL_RenderFillRect(renderer, &rect);
     }
 
+    // Draw lines from cities to the closest net points
+    SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255); // Red for city to net lines
+    for (const auto& [cityPos, _] : cities) {
+        Vector<2> closestNetPoint = findClosestPoint(cityPos, net);
+        drawLine(cityPos, closestNetPoint);
+    }
+
+    /*
+    // Draw lines between closest net points
+    SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255); // Blue for net to net lines
+    for (const auto& [netPos, _] : net) {
+        Vector<2> closestNetPoint = findClosestNetPoint(netPos);
+        if (!(netPos == closestNetPoint)) {
+            drawLine(netPos, closestNetPoint);
+        }
+    }
+    */
 }
 
+Vector<2> SDLWindow::findClosestPoint(const Vector<2>& source, const std::unordered_map<Vector<2>, SDL_Rect>& targets) {
+    Vector<2> closestPoint;
+    float minDistance = std::numeric_limits<float>::max();
+
+    for (const auto& [targetPos, _] : targets) {
+        if (source == targetPos) continue; // Skip the source point itself
+        float distance = calculateDistance(source, targetPos);
+        if (distance < minDistance) {
+            minDistance = distance;
+            closestPoint = targetPos;
+        }
+    }
+
+    return closestPoint;
+}
 
 void SDLWindow::createNet() {
     std::vector<Vector<2>> keys;
@@ -120,14 +142,19 @@ void SDLWindow::createNet() {
 
     Vector<2> middlePoint = Vector<2>{middlePointX, middlePointY};
 
-    recursiveMapGeneration(middlePoint);
-
+    createNetPoints(middlePoint);
 }
 
-void SDLWindow::recursiveMapGeneration(Vector<2> vec) {
+float SDLWindow::calculateDistance(const Vector<2>& point1, const Vector<2>& point2) {
+    float dx = point1[0] - point2[0];
+    float dy = point1[1] - point2[1];
+    return std::sqrt(dx * dx + dy * dy);
+}
+
+void SDLWindow::createNetPoints(Vector<2> vec) {
     const int pointSize = 5;
-    const int numPoints = 10;
-    const int radiusIncrement = 5;
+    const int numPoints = 30;
+    const int radiusIncrement = 10;
 
     float angleIncrement = 2 * M_PI / numPoints;
 
@@ -150,8 +177,6 @@ void SDLWindow::recursiveMapGeneration(Vector<2> vec) {
                                    pointSize };
             Vector<2> newPoint = Vector<2>{x, y};
             net[newPoint] = pointRect;
-
-            // Connect to the middle point
         }
     }
 }
@@ -166,8 +191,8 @@ void SDLWindow::createPoints() {
 
     SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF); // Set draw color to white
 
-    const int numberOfPoints = 5;
-    const int pointSize = 5;
+    const int numberOfPoints = 15;
+    const int pointSize = 10;
 
     for (int i = 0; i < numberOfPoints; ++i) {
         double randomX = (rand() / (double)RAND_MAX) * upperBoundWidth;
